@@ -1,8 +1,37 @@
+/**
+ * Elements that make up the popup.
+ */
+const container = document.getElementById('popup');
+const content = document.getElementById('popup-content');
+const closer = document.getElementById('popup-closer');
+
+/**
+ * Create an overlay to anchor the popup to the map.
+ */
+const overlay = new ol.Overlay({
+    element: container,
+    autoPan: true,
+    autoPanAnimation: {
+        duration: 250,
+    },
+});
+
+/**
+ * Add a click handler to hide the popup.
+ * @return {boolean} Don't follow the href.
+ */
+closer.onclick = function() {
+    overlay.setPosition(undefined);
+    closer.blur();
+    return false;
+};
+
 /* global ol, ContextMenu */
 var view = new ol.View({ center: [0, 0], zoom: 4 }),
     vectorLayer = new ol.layer.Vector({ source: new ol.source.Vector() }),
     baseLayer = new ol.layer.Tile({ source: new ol.source.OSM() }),
     map = new ol.Map({
+        overlays: [overlay],
         target: 'map',
         view: view,
         layers: [baseLayer, vectorLayer],
@@ -43,6 +72,12 @@ var removeMarkerItem = {
     callback: removeMarker,
 };
 
+var infoMarkerItem = {
+    text: 'Marker Info',
+    classname: 'marker',
+    callback: infoMarker,
+};
+
 var contextmenu = new ContextMenu({
     width: 180,
     items: contextmenu_items,
@@ -59,6 +94,10 @@ contextmenu.on('open', function(evt) {
             marker: feature,
         };
         contextmenu.push(removeMarkerItem);
+        infoMarkerItem.data = {
+            evt: evt,
+        };
+        contextmenu.push(infoMarkerItem);
     } else {
         contextmenu.clear();
         contextmenu.extend(contextmenu_items);
@@ -92,6 +131,14 @@ function center(obj) {
 
 function removeMarker(obj) {
     vectorLayer.getSource().removeFeature(obj.data.marker);
+}
+
+function infoMarker(obj) {
+    const coordinate = obj.data.evt.coordinate;
+    const hdms = ol.coordinate.toStringHDMS(ol.proj.toLonLat(coordinate));
+
+    content.innerHTML = '<p>You clicked here:</p><code>' + hdms + '</code>';
+    overlay.setPosition(coordinate);
 }
 
 function marker(obj) {
