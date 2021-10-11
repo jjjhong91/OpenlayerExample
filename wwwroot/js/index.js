@@ -4,6 +4,11 @@
 const container = document.getElementById('popup');
 const content = document.getElementById('popup-content');
 const closer = document.getElementById('popup-closer');
+const target = document.getElementById('map');
+
+const pinIcon = 'img/pin_drop.png';
+const centerIcon = 'img/center.png';
+const listIcon = 'img/view_list.png';
 
 /**
  * Create an overlay to anchor the popup to the map.
@@ -14,6 +19,27 @@ const overlay = new ol.Overlay({
     autoPanAnimation: {
         duration: 250,
     },
+});
+
+const defaultIconFeature = new ol.Feature({
+    geometry: new ol.geom.Point([0, 0]),
+    name: 'Null Island',
+    population: 4000,
+    rainfall: 500,
+});
+
+const defaultIconStyle = new ol.style.Style({
+    image: new ol.style.Icon({
+        anchor: [0.5, 46],
+        anchorXUnits: 'fraction',
+        anchorYUnits: 'pixels',
+        src: pinIcon,
+    }),
+});
+
+defaultIconFeature.setStyle(defaultIconStyle);
+const vectorSource = new ol.source.Vector({
+    features: [defaultIconFeature],
 });
 
 /**
@@ -28,11 +54,11 @@ closer.onclick = function() {
 
 /* global ol, ContextMenu */
 var view = new ol.View({ center: [0, 0], zoom: 4 }),
-    vectorLayer = new ol.layer.Vector({ source: new ol.source.Vector() }),
+    vectorLayer = new ol.layer.Vector({ source: vectorSource }),
     baseLayer = new ol.layer.Tile({ source: new ol.source.OSM() }),
     map = new ol.Map({
         overlays: [overlay],
-        target: 'map',
+        target: target,
         view: view,
         layers: [baseLayer, vectorLayer],
     });
@@ -40,12 +66,12 @@ var view = new ol.View({ center: [0, 0], zoom: 4 }),
 var contextmenu_items = [{
         text: 'Center map here',
         classname: 'bold',
-        icon: 'img/center.png',
+        icon: centerIcon,
         callback: center,
     },
     {
         text: 'Some Actions',
-        icon: 'img/view_list.png',
+        icon: listIcon,
         items: [{
                 text: 'Center map here',
                 icon: 'img/center.png',
@@ -53,14 +79,14 @@ var contextmenu_items = [{
             },
             {
                 text: 'Add a Marker',
-                icon: 'img/pin_drop.png',
+                icon: pinIcon,
                 callback: marker,
             },
         ],
     },
     {
         text: 'Add a Marker',
-        icon: 'img/pin_drop.png',
+        icon: pinIcon,
         callback: marker,
     },
     '-', // this is a separator
@@ -83,6 +109,20 @@ var contextmenu = new ContextMenu({
     items: contextmenu_items,
 });
 map.addControl(contextmenu);
+
+const modify = new ol.interaction.Modify({
+    hitDetection: vectorLayer,
+    source: vectorSource,
+});
+modify.on(['modifystart', 'modifyend'], function(evt) {
+    target.style.cursor = evt.type === 'modifystart' ? 'grabbing' : 'pointer';
+});
+const overlaySource = modify.getOverlay().getSource();
+overlaySource.on(['addfeature', 'removefeature'], function(evt) {
+    target.style.cursor = evt.type === 'addfeature' ? 'pointer' : '';
+});
+
+map.addInteraction(modify);
 
 contextmenu.on('open', function(evt) {
     var feature = map.forEachFeatureAtPixel(evt.pixel, function(ft, l) {
@@ -145,7 +185,7 @@ function marker(obj) {
     var coord4326 = ol.proj.transform(obj.coordinate, 'EPSG:3857', 'EPSG:4326'),
         template = 'Coordinate is ({x} | {y})',
         iconStyle = new ol.style.Style({
-            image: new ol.style.Icon({ scale: 0.6, src: 'img/pin_drop.png' }),
+            image: new ol.style.Icon({ scale: 0.6, src: pinIcon }),
             text: new ol.style.Text({
                 offsetY: 25,
                 text: ol.coordinate.format(coord4326, template, 2),
