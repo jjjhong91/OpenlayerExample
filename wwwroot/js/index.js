@@ -122,7 +122,10 @@ overlaySource.on(['addfeature', 'removefeature'], function(evt) {
     target.style.cursor = evt.type === 'addfeature' ? 'pointer' : '';
 });
 
-map.addInteraction(modify);
+map.addControl(new EnableModificationControl({
+    modify: modify
+}));
+//map.addInteraction(modify);
 
 contextmenu.on('open', function(evt) {
     var feature = map.forEachFeatureAtPixel(evt.pixel, function(ft, l) {
