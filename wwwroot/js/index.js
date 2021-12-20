@@ -53,7 +53,7 @@ closer.onclick = function() {
 };
 
 /* global ol, ContextMenu */
-var view = new ol.View({ center: [0, 0], zoom: 4 }),
+var view = new ol.View({ center: [0, 0], zoom: 4 , multiWorld: true}),
     vectorLayer = new ol.layer.Vector({ source: vectorSource }),
     baseLayer = new ol.layer.Tile({ source: new ol.source.OSM() }),
     map = new ol.Map({
@@ -104,6 +104,12 @@ var infoMarkerItem = {
     callback: infoMarker,
 };
 
+var flashMarkerItem = {
+    text: 'Flash',
+    classname: 'marker',
+    callback: flashMarker
+};
+
 var contextmenu = new ContextMenu({
     width: 180,
     items: contextmenu_items,
@@ -141,6 +147,10 @@ contextmenu.on('open', function(evt) {
             evt: evt,
         };
         contextmenu.push(infoMarkerItem);
+        flashMarkerItem.data = {
+            marker: feature,
+        }
+        contextmenu.push(flashMarkerItem);
     } else {
         contextmenu.clear();
         contextmenu.extend(contextmenu_items);
@@ -184,6 +194,11 @@ function infoMarker(obj) {
     overlay.setPosition(coordinate);
 }
 
+function flashMarker(obj) {
+    var feature = obj.data.marker;
+    flash(feature);
+}
+
 function marker(obj) {
     var coord4326 = ol.proj.transform(obj.coordinate, 'EPSG:3857', 'EPSG:4326'),
         template = 'Coordinate is ({x} | {y})',
@@ -204,4 +219,40 @@ function marker(obj) {
 
     feature.setStyle(iconStyle);
     vectorLayer.getSource().addFeature(feature);
+}
+
+const duration = 3000;
+function flash(feature) {
+  const start = Date.now();
+  const flashGeom = feature.getGeometry().clone();
+  const listenerKey = baseLayer.on('postrender', animate);
+
+  function animate(event) {
+    const frameState = event.frameState;
+    const elapsed = frameState.time - start;
+    if (elapsed >= duration) {
+        ol.Observable.unByKey(listenerKey);
+      return;
+    }
+    const vectorContext = ol.render.getVectorContext(event);
+    const elapsedRatio = elapsed / duration;
+    // radius will be 5 at start and 30 at end.
+    const radius = ol.easing.easeOut(elapsedRatio) * 25 + 5;
+    const opacity = ol.easing.easeOut(1 - elapsedRatio);
+
+    const style = new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: radius,
+        stroke: new ol.style.Stroke({
+          color: 'rgba(255, 0, 0, ' + opacity + ')',
+          width: 0.25 + opacity,
+        }),
+      }),
+    });
+
+    vectorContext.setStyle(style);
+    vectorContext.drawGeometry(flashGeom);
+    // tell OpenLayers to continue postrender animation
+    map.render();
+  }
 }
