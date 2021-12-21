@@ -53,7 +53,7 @@ closer.onclick = function() {
 };
 
 /* global ol, ContextMenu */
-var view = new ol.View({ center: [0, 0], zoom: 4 , multiWorld: true}),
+var view = new ol.View({ center: [0, 0], zoom: 4, multiWorld: true }),
     vectorLayer = new ol.layer.Vector({ source: vectorSource }),
     baseLayer = new ol.layer.Tile({ source: new ol.source.OSM() }),
     map = new ol.Map({
@@ -194,9 +194,14 @@ function infoMarker(obj) {
     overlay.setPosition(coordinate);
 }
 
+let timer;
+
 function flashMarker(obj) {
     var feature = obj.data.marker;
-    flash(feature);
+    if(timer) clearInterval(timer);
+    timer = setInterval(() => {
+        flash(feature);
+    }, 3000);
 }
 
 function marker(obj) {
@@ -222,37 +227,38 @@ function marker(obj) {
 }
 
 const duration = 3000;
+
 function flash(feature) {
-  const start = Date.now();
-  const flashGeom = feature.getGeometry().clone();
-  const listenerKey = baseLayer.on('postrender', animate);
 
-  function animate(event) {
-    const frameState = event.frameState;
-    const elapsed = frameState.time - start;
-    if (elapsed >= duration) {
-        ol.Observable.unByKey(listenerKey);
-      return;
+    const start = Date.now();
+    const flashGeom = feature.getGeometry().clone();
+    const listenerKey = baseLayer.on('postrender', animate);
+
+    function animate(event) {
+        const frameState = event.frameState;
+        const elapsed = frameState.time - start;
+        if (elapsed >= duration) {
+            ol.Observable.unByKey(listenerKey);
+            return;
+        }
+        const vectorContext = ol.render.getVectorContext(event);
+        const elapsedRatio = elapsed / duration;
+        // radius will be 5 at start and 30 at end.
+        const radius = ol.easing.easeOut(elapsedRatio) * 25 + 5;
+        const opacity = ol.easing.easeOut(1 - elapsedRatio);
+
+        const style = new ol.style.Style({
+            image: new ol.style.Circle({
+                radius: radius,
+                stroke: new ol.style.Stroke({
+                    color: 'rgba(255, 0, 0, ' + opacity + ')',
+                    width: 0.25 + opacity,
+                }),
+            }),
+        });
+
+        vectorContext.setStyle(style);
+        vectorContext.drawGeometry(flashGeom);
+        map.render();
     }
-    const vectorContext = ol.render.getVectorContext(event);
-    const elapsedRatio = elapsed / duration;
-    // radius will be 5 at start and 30 at end.
-    const radius = ol.easing.easeOut(elapsedRatio) * 25 + 5;
-    const opacity = ol.easing.easeOut(1 - elapsedRatio);
-
-    const style = new ol.style.Style({
-      image: new ol.style.Circle({
-        radius: radius,
-        stroke: new ol.style.Stroke({
-          color: 'rgba(255, 0, 0, ' + opacity + ')',
-          width: 0.25 + opacity,
-        }),
-      }),
-    });
-
-    vectorContext.setStyle(style);
-    vectorContext.drawGeometry(flashGeom);
-    // tell OpenLayers to continue postrender animation
-    map.render();
-  }
 }
